@@ -10,7 +10,7 @@ and generate intelligent insights.
 
 ```bash
 # 1. Clone repo
-git clone https://github.com/<your-username>/ai-productivity-assistant.git
+git clone https://github.com/adiiirajjj/ai-productivity-assistant.git
 cd ai-productivity-assistant
 
 # 2. Install dependencies
