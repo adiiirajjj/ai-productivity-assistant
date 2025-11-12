@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Productivity Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .spinner {
+      border: 3px solid rgba(0, 0, 0, 0.1);
+      border-top: 3px solid #6366f1;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .fade-in {
+      animation: fadeIn 0.8s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col items-center justify-center">
+
+  <div class="bg-white shadow-xl rounded-xl p-8 w-full max-w-md fade-in">
+    <h1 class="text-2xl font-bold text-center text-indigo-600 mb-6">
+      🧠 AI Productivity Assistant
+    </h1>
+
+    <form id="predictForm" class="space-y-4" method="post" action="/predict">
+      <input class="w-full border rounded p-2" name="hours_worked" placeholder="Hours Worked (e.g. 8)" required>
+      <input class="w-full border rounded p-2" name="sleep_hours" placeholder="Sleep Hours (e.g. 7)" required>
+      <input class="w-full border rounded p-2" name="tasks_completed" placeholder="Tasks Completed (e.g. 10)" required>
+      <input class="w-full border rounded p-2" name="breaks_taken" placeholder="Breaks Taken (e.g. 2)" required>
+      <input class="w-full border rounded p-2" name="focus_level" placeholder="Focus Level (0–1)" required>
+
+      <button id="submitButton" type="submit" class="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700">
+        Predict Productivity
+      </button>
+    </form>
+
+    <div id="loading" class="hidden mt-6 text-center text-gray-500">
+      <span class="spinner"></span>
+      <span class="ml-2">Generating AI Insight...</span>
+    </div>
+
+    {% if result %}
+    <div id="resultBox" class="mt-6 p-4 bg-gray-100 rounded fade-in">
+      <h2 class="font-semibold text-lg mb-2 text-indigo-700">Result</h2>
+      <p><strong>Predicted Productivity:</strong> {{ result.prediction }}</p>
+      <p><strong>Recommendation:</strong> {{ result.recommendation }}</p>
+      <p class="mt-2 text-sm text-gray-700">{{ result.ai_text }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Trend Chart Section -->
+    <div class="mt-8">
+      <h3 class="text-lg font-semibold text-indigo-600 text-center mb-3">📈 Productivity Trend</h3>
+      <canvas id="trendChart" width="400" height="200"></canvas>
+    </div>
+  </div>
+
+  <footer class="mt-6 text-gray-400 text-sm text-center">
+    ⚡ Powered by <a href="https://openrouter.ai/" target="_blank" class="text-indigo-500 hover:text-indigo-700">OpenRouter AI</a>
+  </footer>
+
+  <script>
+    const form = document.getElementById("predictForm");
+    const loading = document.getElementById("loading");
+    const submitBtn = document.getElementById("submitButton");
+
+    // Spinner logic
+    form.addEventListener("submit", () => {
+      loading.classList.remove("hidden");
+      submitBtn.disabled = true;
+      submitBtn.classList.add("opacity-70");
+    });
+
+    // Trend Chart logic
+    const ctx = document.getElementById("trendChart").getContext("2d");
+
+    // Load data from localStorage
+    const storedData = JSON.parse(localStorage.getItem("productivityData") || "[]");
+
+    const chart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: storedData.map(d => d.time),
+        datasets: [{
+          label: "Productivity Score (0=Low, 1=Medium, 2=High)",
+          data: storedData.map(d => d.score),
+          borderColor: "#6366f1",
+          backgroundColor: "rgba(99, 102, 241, 0.2)",
+          tension: 0.3,
+          fill: true,
+          pointRadius: 4
+        }]
+      },
+      options: {
+        scales: {
+          y: { min: 0, max: 2, ticks: { stepSize: 1, callback: v => ["Low","Medium","High"][v] } }
+        }
+      }
+    });
+
+    // Automatically record new predictions (if available in template)
+    const resultBox = document.getElementById("resultBox");
+    if (resultBox) {
+      const prediction = "{{ result.prediction }}";
+      const map = { "Low": 0, "Medium": 1, "High": 2 };
+      const score = map[prediction];
+      const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+      storedData.push({ time: now, score });
+      if (storedData.length > 10) storedData.shift(); // keep last 10 entries
+      localStorage.setItem("productivityData", JSON.stringify(storedData));
+
+      chart.data.labels = storedData.map(d => d.time);
+      chart.data.datasets[0].data = storedData.map(d => d.score);
+      chart.update();
+    }
+  </script>
+<div class="mt-8 p-4 bg-gray-100 rounded">
+  <h3 class="text-lg font-semibold text-indigo-600 text-center mb-3">🧾 Weekly AI Summary</h3>
+  <button id="summaryButton" class="w-full bg-indigo-500 text-white py-2 rounded hover:bg-indigo-600">
+    Generate Weekly Summary
+  </button>
+  <p id="summaryText" class="mt-4 text-gray-700 text-sm italic text-center"></p>
+</div>
+
+<script>
+  document.getElementById("summaryButton").addEventListener("click", async () => {
+    const btn = document.getElementById("summaryButton");
+    const text = document.getElementById("summaryText");
+    btn.disabled = true;
+    text.textContent = "🔄 Generating summary...";
+    const res = await fetch("/weekly_summary");
+    const data = await res.json();
+    text.textContent = data.summary;
+    btn.disabled = false;
+  });
+</script>
+<div class="mt-8">
+  <h3 class="text-lg font-semibold text-indigo-600 text-center mb-3">📊 Productivity Breakdown</h3>
+  <canvas id="barChart" width="400" height="200"></canvas>
+</div>
+
+<script>
+  const barCtx = document.getElementById("barChart").getContext("2d");
+  const productivityCounts = {
+    Low: storedData.filter(d => d.score === 0).length,
+    Medium: storedData.filter(d => d.score === 1).length,
+    High: storedData.filter(d => d.score === 2).length
+  };
+
+  new Chart(barCtx, {
+    type: "bar",
+    data: {
+      labels: ["Low", "Medium", "High"],
+      datasets: [{
+        label: "Days per Category",
+        data: [productivityCounts.Low, productivityCounts.Medium, productivityCounts.High],
+        backgroundColor: ["#ef4444", "#facc15", "#22c55e"]
+      }]
+    },
+    options: {
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+</script>
+
+</body>
+</html>

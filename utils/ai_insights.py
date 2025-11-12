@@ -1,15 +1,33 @@
-import requests
+from dotenv import load_dotenv
+load_dotenv()
+
+import os, requests
+
+OPENROUTER_KEY = os.getenv("OPENROUTER_KEY", "")
 
 def get_ai_insight(prompt: str):
-    """
-    Generates an AI text insight using Hugging Face Inference API (Free)
-    """
-    model_url = "https://api-inference.huggingface.co/models/google/flan-t5-base"
-    payload = {"inputs": prompt}
-    response = requests.post(model_url, json=payload)
+    """Generate insight via free OpenRouter API"""
+    if not OPENROUTER_KEY:
+        return "⚠️ Missing OpenRouter key."
 
-    if response.status_code == 200:
-        output = response.json()[0]["generated_text"]
-        return output.strip()
-    else:
-        return "AI insight unavailable. Try again later."
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_KEY}",
+        "HTTP-Referer": "http://localhost:8000",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "mistralai/mistral-7b-instruct",  # free public model
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7
+    }
+
+    try:
+        r = requests.post("https://openrouter.ai/api/v1/chat/completions",
+                          headers=headers, json=payload, timeout=30)
+        if r.status_code == 200:
+            data = r.json()
+            return data["choices"][0]["message"]["content"].strip()
+        else:
+            return f"⚠️ API Error {r.status_code}: {r.text[:120]}"
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
